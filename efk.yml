@@ -1,0 +1,51 @@
+version: '3.9'
+
+services:
+
+  fluentd:
+    image: final_fluentd
+#    build:
+#      context: ./fluentd
+    ports:
+      - 24224:24224
+#      - 24224:24224/udp
+    networks:
+      - netext
+    volumes:
+      - ./fluentd/fluent.conf:/fluentd/etc/fluent.conf
+
+  elasticsearch:
+    image: elasticsearch:7.17.15
+    expose:
+      - 9200
+      - 9300
+    ports:
+      - 9200:9200
+      - 9300:9300
+    environment:
+      - discovery.type=single-node
+#    volumes:
+#      - ./es/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
+#      - esdata:/usr/share/elasticsearch/data
+    networks:
+      - netext
+
+  kibana:
+    image: kibana:7.17.15
+    deploy:
+      replicas: 1
+      labels:
+    ports:
+      - 5601:5601
+#    environment:
+#      - TZ=Asia/Kathmandu            
+#     - ELASTICSEARCH_HOSTS=https://elasticsearch:9200
+
+#    volumes:
+#      - ./kibana/kibana.yml:/usr/share/kibana/config/kibana.yml
+    networks:
+      - netext
+
+networks:
+  netext:
+    external: true

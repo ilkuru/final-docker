@@ -1,0 +1,101 @@
+version: '3.9'
+
+services:
+
+  proxy:
+    image: traefik:v2.5
+    labels:
+      - traefik.enable=true
+    command:
+      - --api.insecure=true
+      - --providers.docker=true
+      - --entrypoints.web.address=:80
+#      - --providers.docker.swarmmode
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    depends_on:
+      - speedtest
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: localhost:24224
+        tag: proxy
+    networks:
+      - lan
+
+  speedtest:
+    build:
+      context: ./speedtest
+      dockerfile: Dockerfile
+    image: php-fpm
+    depends_on:
+      - postgresql
+
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.php-fpm.rule=Host(`${LOCAL_IP?Variable not set}`)  
+      - traefik.http.services.php-fpm.loadbalancer.server.port=80
+    environment:
+      - TELEMETRY=true
+      - TITLE=test
+      - MODE=frontend
+      - PASSWORD=password
+      - ENABLE_ID_OBFUSCATION=true
+      - REDACT_IP_ADDRESSES=false
+      - DB_TYPE=postgresql
+      - DB_NAME=speed
+      - DB_HOSTNAME=postgresql 
+      - DB_USERNAME=root
+      - DB_PASSWORD=Abc
+
+    volumes:
+      - ./speedtest/servers.json:/servers.json
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: localhost:24224
+        tag: speedtest
+    networks:
+      - lan
+
+  postgresql:
+    image: postgres
+    environment:
+      POSTGRES_USER: "root"
+      POSTGRES_PASSWORD: "Abc"
+      POSTGRES_DB: "speed"
+    expose:
+      - "5432"
+    ports:
+      - "5432:5432"
+    volumes:
+        - db_data:/var/lib/postgresql/data
+        - ./speedtest/results/telemetry_postgresql.sql:/docker-entrypoint-initdb.d/telemetry_postgresql.sql
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: localhost:24224
+        tag: postgresql
+
+    networks:
+      - lan
+
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "8081:80"
+    networks:
+      - lan
+
+networks:
+  lan:
+    external: true
+
+volumes:
+  db_data:
